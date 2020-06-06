@@ -402,8 +402,12 @@ void GroupEngraver::determine_staves_position()
 {
     ImoInstrument* pFirstInstr = m_pGroup->get_first_instrument();
     ImoInstrument* pLastInstr = m_pGroup->get_last_instrument();
-    m_stavesTop = m_pParts->get_staff_top_position_for(pFirstInstr);
-    m_stavesBottom = m_pParts->get_staff_bottom_position_for(pLastInstr);
+    if (pFirstInstr && pLastInstr) {
+        m_stavesTop = m_pParts->get_staff_top_position_for(pFirstInstr);
+        m_stavesBottom = m_pParts->get_staff_bottom_position_for(pLastInstr);
+    } else {
+        // this can happen when group is empty
+    }
 }
 
 ////---------------------------------------------------------------------------------------
@@ -475,7 +479,8 @@ void GroupEngraver::measure_brace_or_bracket()
 bool GroupEngraver::has_brace_or_bracket()
 {
     int symbol = m_pGroup->get_symbol();
-    return (symbol != ImoInstrGroup::k_none);
+    bool hasoneorless = m_pGroup->get_first_instrument() == m_pGroup->get_last_instrument();
+    return (symbol != ImoInstrGroup::k_none && !hasoneorless);
 }
 
 //---------------------------------------------------------------------------------------
@@ -773,7 +778,7 @@ void InstrumentEngraver::set_staves_horizontal_position(LUnits x, LUnits width,
 
 //---------------------------------------------------------------------------------------
 LUnits InstrumentEngraver::set_staves_vertical_position(LUnits y)
-{
+{    
     int iStaff = 0;
     for (; iStaff < m_pInstr->get_num_staves(); iStaff++)
 	{
@@ -784,6 +789,7 @@ LUnits InstrumentEngraver::set_staves_vertical_position(LUnits y)
         y += pStaff->get_height();
         m_staffBottom[iStaff] = y;
         m_lineThickness[iStaff] = pStaff->get_line_thickness();
+        //fprintf(stderr, "IEG:%20s  H: %6g  T: %6g  B: %6g  M: %6g  L: %5g  orig: %6.1f\n", m_pInstr->get_name().get_text().c_str(), pStaff->get_height(), m_staffTop[iStaff], m_staffBottom[iStaff], pStaff->get_staff_margin(), m_lineThickness[iStaff], m_org.y);
     }
     return m_staffBottom[iStaff-1];
 }
@@ -793,6 +799,12 @@ void InstrumentEngraver::reposition_staff(int iStaff, LUnits yShift)
 {
     m_yShifts[iStaff] = yShift;
 }
+
+void InstrumentEngraver::reset_shifts()
+{
+    std::fill(m_yShifts.begin(), m_yShifts.end(), 0.0);
+}
+
 
 //---------------------------------------------------------------------------------------
 LUnits InstrumentEngraver::get_top_line_of_staff(int iStaff)

@@ -64,6 +64,7 @@ class SimpleView;
 class VerticalBookView;
 class HorizontalBookView;
 class SingleSystemView;
+class SingleSystemVerticalView;
 class Interactor;
 class Presenter;
 class LomseDoorway;
@@ -280,6 +281,8 @@ public:
     static HorizontalBookView* inject_HorizontalBookView(LibraryScope& libraryScope,
                                                          Document* pDoc);
     static SingleSystemView* inject_SingleSystemView(LibraryScope& libraryScope,
+                                                     Document* pDoc);
+    static SingleSystemVerticalView* inject_SingleSystemVerticalView(LibraryScope& libraryScope,
                                                      Document* pDoc);
     static Interactor* inject_Interactor(LibraryScope& libraryScope,
                                          WpDocument wpDoc, View* pView,

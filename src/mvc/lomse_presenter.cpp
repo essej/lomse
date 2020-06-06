@@ -67,7 +67,7 @@ public:
             return Document::k_format_ldp;
         else if (ext == "lmd")
             return Document::k_format_lmd;
-        else if (ext == "xml" || ext == "musicxml")
+        else if (ext == "xml" || ext == "musicxml" || ext == "mxl")
             return Document::k_format_mxl;
         else if (ext == "mnx")
             return Document::k_format_mnx;
@@ -125,6 +125,16 @@ Presenter* PresenterBuilder::open_document(int viewType, LdpReader& reader,
     return Injector::inject_Presenter(m_libScope, viewType, pDoc);
 }
 
+//---------------------------------------------------------------------------------------
+void PresenterBuilder::add_interactor(int viewType, Presenter* pPresenter)
+{
+    View* pView = Injector::inject_View(m_libScope, viewType, pPresenter->get_document_raw_ptr());
+    DocCommandExecuter* pExec = Injector::inject_DocCommandExecuter(pPresenter->get_document_raw_ptr());
+    Interactor* pInteractor = Injector::inject_Interactor(m_libScope, pPresenter->get_document_weak_ptr(), pView, pExec);
+    pView->set_interactor(pInteractor);
+    pPresenter->add_interactor(pInteractor);
+}
+
 
 //=======================================================================================
 //Presenter implementation
@@ -146,6 +156,29 @@ Presenter::~Presenter()
     LOMSE_LOG_TRACE(Logger::k_mvc, "[Presenter::~Presenter] Presenter is deleted");
     delete m_pExec;
 }
+
+int Presenter::add_interactor(Interactor * pIntor) 
+{
+    m_interactors.push_back( SpInteractor(pIntor) );
+    m_spDoc->add_event_handler(k_doc_modified_event, pIntor);
+    return (int) m_interactors.size() - 1;
+}
+
+bool Presenter::remove_interactor(int iIntor) 
+{
+    if (m_interactors.size() > 1) {
+        std::list<SpInteractor>::iterator it;
+        int i = 0;
+        for (it=m_interactors.begin(); it != m_interactors.end() && i != iIntor; ++it, ++i);
+        if (i == iIntor && it != m_interactors.end()) {
+            
+            m_interactors.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
 
 //---------------------------------------------------------------------------------------
 SpInteractor Presenter::get_interactor_shared_ptr(int iIntor)

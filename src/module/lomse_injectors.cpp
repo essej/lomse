@@ -399,6 +399,14 @@ SingleSystemView* Injector::inject_SingleSystemView(LibraryScope& libraryScope,
 }
 
 //---------------------------------------------------------------------------------------
+SingleSystemVerticalView* Injector::inject_SingleSystemVerticalView(LibraryScope& libraryScope,
+                                                    Document* pDoc)
+{
+    return static_cast<SingleSystemVerticalView*>(
+                        inject_View(libraryScope, k_view_single_system_vertical, pDoc) );
+}
+
+//---------------------------------------------------------------------------------------
 View* Injector::inject_View(LibraryScope& libraryScope, int viewType,
                             Document* UNUSED(pDoc))
 {

@@ -54,6 +54,7 @@ class VerticalBookView;
 class HorizontalBookView;
 class SimpleView;
 class SingleSystemView;
+class SingleSystemVerticalView;
 class Document;
 class Presenter;
 class ScorePlayer;
@@ -366,6 +367,16 @@ public:
     Presenter* open_document(int viewType, LdpReader& reader,
                              ostream& reporter = cout);
 
+    /** Adds a new view and associated interactor to an existing presenter of an already 
+     open document.
+     
+     @param viewType The view type that will be used for rendering this document.
+     @param pPresenter The existing presenter to add a new interactor to
+     
+     */
+    void add_interactor(int viewType, Presenter* pPresenter);
+
+    
     //access to global objects
 
 	/** Get the pointer to an object of class LibraryScope. This object gives access to

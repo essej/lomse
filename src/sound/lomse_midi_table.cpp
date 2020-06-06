@@ -106,14 +106,16 @@ void SoundEventsTable::create_table()
 //---------------------------------------------------------------------------------------
 void SoundEventsTable::program_sounds_for_instruments()
 {
-	int numInstruments = m_pScore->get_num_instruments();
+	int numInstruments = m_pScore->get_num_instruments_actual();
     m_channels.resize(numInstruments);
-
+    m_transposes.resize(numInstruments);
+    
     for (int iInstr = 0; iInstr < numInstruments; iInstr++)
     {
-        ImoInstrument* pInstr = m_pScore->get_instrument(iInstr);
+        ImoInstrument* pInstr = m_pScore->get_instrument_actual(iInstr);
         int channel = 0;
         int instr = 0;
+        int transpose = pInstr->get_chromatic_transpose();
         if (pInstr->get_num_sounds() > 0)
         {
             ImoSoundInfo* pInfo = pInstr->get_sound_info(0);
@@ -122,7 +124,8 @@ void SoundEventsTable::program_sounds_for_instruments()
             instr = pMidi->get_midi_program();
         }
         m_channels[iInstr] = channel;
-        store_event(0, SoundEvent::k_prog_instr, channel, instr, 0, 0, nullptr, 0);
+        m_transposes[iInstr] = transpose;
+        store_event(0, SoundEvent::k_prog_instr, channel, instr, 0, 0, nullptr, 0, iInstr);
     }
 }
 
@@ -138,6 +141,10 @@ void SoundEventsTable::create_events()
     ImoKeySignature* pKey = nullptr;
     reset_accidentals(pKey);
 
+    // default all dynamics to 100% of forte (same unit as dynamics attribute in sound element of direction)
+    m_pendingDynamics.clear();
+    m_pendingDynamics.resize(m_pScore->get_num_instruments_actual(), 0.0);
+    
     //iterate over the collection to create the MIDI events
     while(!cursor.is_end())
     {
@@ -148,7 +155,8 @@ void SoundEventsTable::create_events()
         {
             int iInstr = cursor.num_instrument();
             int channel = m_channels[iInstr];
-            add_noterest_events(cursor, channel, measure);
+            int transpose = m_transposes[iInstr];
+            add_noterest_events(cursor, channel, measure, transpose, iInstr);
         }
         else if (pSO->is_barline())
         {
@@ -183,7 +191,9 @@ void SoundEventsTable::create_events()
         }
         else if (pSO->is_time_signature())
         {
-            add_rythm_change(cursor, measure, static_cast<ImoTimeSignature*>(pSO));
+            int iInstr = cursor.num_instrument();
+
+            add_rythm_change(cursor, measure, static_cast<ImoTimeSignature*>(pSO), iInstr);
         }
         else if (pSO->is_key_signature())
         {
@@ -216,12 +226,14 @@ void SoundEventsTable::create_events()
 void SoundEventsTable::process_sound_change(ImoSoundChange* pSound,
                                             StaffObjsCursor& cursor,
                                             int UNUSED(channel),
-                                            int UNUSED(iInstr), int measure)
+                                            int iInstr, int measure)
 {
     ImoAttr* pAttr = pSound->get_first_attribute();
     while (pAttr)
     {
         JumpEntry* pJump = nullptr;
+        float fltval;
+        
         switch (pAttr->get_attrib_idx())
         {
             case k_attr_coda:
@@ -259,18 +271,34 @@ void SoundEventsTable::process_sound_change(ImoSoundChange* pSound,
                 break;
 
             case k_attr_dynamics:
+                fltval = pAttr->get_float_value();
+                if (iInstr < m_pendingDynamics.size()) {
+                    m_pendingDynamics[iInstr] = fltval;
+                }
                 break;
             case k_attr_forward_repeat:
                 break;
             case k_attr_time_only:
                 break;
             case k_attr_tempo:
+                fltval = pAttr->get_float_value();
+                add_tempo_change(cursor, measure, fltval);
                 break;
             default:
                 break;
         }
         pAttr = pAttr->get_next_attrib();
     }
+}
+
+void SoundEventsTable::add_tempo_change(StaffObjsCursor& cursor, 
+                                        int measure,
+                                        double tempo)
+{
+    TimeUnits rTime = cursor.time();
+    int usecPerQuarterNote = (int) lrintf(60.0e6 / tempo);
+    store_event(rTime, SoundEvent::k_tempo_change, 0, usecPerQuarterNote,
+                0, 0, 0, measure, -1);
 }
 
 //---------------------------------------------------------------------------------------
@@ -338,10 +366,10 @@ void SoundEventsTable::add_jumps_if_volta_bracket(StaffObjsCursor& cursor,
 //---------------------------------------------------------------------------------------
 void SoundEventsTable::store_event(TimeUnits rTime, int eventType, int channel,
                                    MidiPitch pitch, int volume, int step,
-                                   ImoStaffObj* pSO, int measure)
+                                   ImoStaffObj* pSO, int measure, int track)
 {
     SoundEvent* pEvent = LOMSE_NEW SoundEvent(rTime, eventType, channel, pitch,
-                                              volume, step, pSO, measure);
+                                              volume, step, pSO, measure, track);
     m_events.push_back(pEvent);
     m_numMeasures = max(m_numMeasures, measure);
 }
@@ -356,7 +384,7 @@ void SoundEventsTable::store_jump_event(TimeUnits rTime, JumpEntry* pJump, int m
 
 //---------------------------------------------------------------------------------------
 void SoundEventsTable::add_noterest_events(StaffObjsCursor& cursor, int channel,
-                                           int measure)
+                                           int measure, int transpose, int track)
 {
     ImoStaffObj* pSO = cursor.get_staffobj();
     ImoTimeSignature* pTS = cursor.get_applicable_time_signature();
@@ -366,7 +394,7 @@ void SoundEventsTable::add_noterest_events(StaffObjsCursor& cursor, int channel,
     if (pSO->is_note())
     {
         pNote = static_cast<ImoNote*>(pSO);
-        pitch = int(pNote->get_midi_pitch());
+        pitch = int(pNote->get_midi_pitch()) + transpose;
     }
 
     //AWARE: Visual on/off events are implicit in note on/off events and these
@@ -383,23 +411,29 @@ void SoundEventsTable::add_noterest_events(StaffObjsCursor& cursor, int channel,
         {
             //It is not tied to the previous one. Generate NoteOn event to
             //start the sound and highlight the note
-            int volume = compute_volume(rTime, pTS, cursor.anacrusis_missing_time());
+            ImoArticulationSymbol * artic = dynamic_cast<ImoArticulationSymbol*>(pNote->find_attachment(k_imo_articulation_symbol));
+            int articType = k_articulation_unknown;
+            if (artic) {                
+                articType = artic->get_articulation_type();
+            }
+
+            int volume = compute_volume(rTime, pTS, cursor.anacrusis_missing_time(), articType, track);
             store_event(rTime, SoundEvent::k_note_on, channel, pitch,
-                        volume, step, pSO, measure);
+                        volume, step, pSO, measure, track);
         }
         else
         {
             //This note is tied to the previous one. Generate only a VisualOn event as the
             //sound is already started by the previous note.
             store_event(rTime, SoundEvent::k_visual_on, channel, pitch,
-                        0, step, pSO, measure);
+                        0, step, pSO, measure, track);
         }
     }
     else
     {
         //it is a rest. Generate only event for visual highlight
         if (pSO->is_visible())
-            store_event(rTime, SoundEvent::k_visual_on, channel, 0, 0, 0, pSO, measure);
+            store_event(rTime, SoundEvent::k_visual_on, channel, 0, 0, 0, pSO, measure, track);
     }
 
     //generate NoteOff event
@@ -409,30 +443,44 @@ void SoundEventsTable::add_noterest_events(StaffObjsCursor& cursor, int channel,
         //It is a note
         if (!pNote->is_tied_next())
         {
+            TimeUnits timeAdj = 0.0;
+            
+            ImoArticulationSymbol * artic = dynamic_cast<ImoArticulationSymbol*>(pNote->find_attachment(k_imo_articulation_symbol));
+            if (artic) {                
+                if (artic->get_articulation_type() == k_articulation_staccato) {
+                    // for staccato, use 60% of original duration
+                    timeAdj = -0.4 * pSO->get_duration();
+                }
+                else if (artic->get_articulation_type() == k_articulation_staccatissimo) {
+                    // for staccatissimo, use 40% of original duration
+                    timeAdj = -0.6 * pSO->get_duration();
+                }
+            }
+            
             //It is not tied to next note. Generate NoteOff event to stop the sound and
             //un-highlight the note
-            store_event(rTime, SoundEvent::k_note_off, channel, pitch,
-                        0, step, pSO, measure);
+            store_event(rTime + timeAdj, SoundEvent::k_note_off, channel, pitch,
+                        0, step, pSO, measure, track);
         }
         else
         {
             //This note is tied to the next one. Generate only a VisualOff event so that
             //the note will be un-highlighted but the sound will not be stopped.
             store_event(rTime, SoundEvent::k_visual_off, channel, pitch,
-                        0, step, pSO, measure);
+                        0, step, pSO, measure, track);
         }
     }
     else
     {
         //Is a rest. Generate only a VisualOff event
         if (pSO->is_visible())
-            store_event(rTime, SoundEvent::k_visual_off, channel, 0, 0, 0, pSO, measure);
+            store_event(rTime, SoundEvent::k_visual_off, channel, 0, 0, 0, pSO, measure, track);
     }
 }
 
 //---------------------------------------------------------------------------------------
 void SoundEventsTable::add_rythm_change(StaffObjsCursor& cursor, int measure,
-                                        ImoTimeSignature* pTS)
+                                        ImoTimeSignature* pTS, int track)
 {
     TimeUnits rTime = cursor.time();
     int topNumber = pTS->get_top_number();
@@ -440,7 +488,7 @@ void SoundEventsTable::add_rythm_change(StaffObjsCursor& cursor, int measure,
     int beatDuration = int( pTS->get_ref_note_duration() );
 
     store_event(rTime, SoundEvent::k_rhythm_change, 0, topNumber,
-                numBeats, beatDuration, pTS, measure);
+                numBeats, beatDuration, pTS, measure, track);
 }
 
 //---------------------------------------------------------------------------------------
@@ -449,7 +497,7 @@ void SoundEventsTable::close_table()
     TimeUnits maxTime = 0.0;
     if (m_events.size() > 0)
         maxTime = TimeUnits(m_events.back()->DeltaTime);
-    store_event(maxTime, SoundEvent::k_end_of_score, 0, 0, 0, 0, nullptr, 0);
+    store_event(maxTime, SoundEvent::k_end_of_score, 0, 0, 0, 0, nullptr, 0, -1);
 }
 
 //---------------------------------------------------------------------------------------
@@ -615,21 +663,23 @@ string SoundEventsTable::dump_measures_table()
 
 //---------------------------------------------------------------------------------------
 int SoundEventsTable::compute_volume(TimeUnits timePos, ImoTimeSignature* pTS,
-                                     TimeUnits timeShift)
+                                     TimeUnits timeShift, int articulationType, int track)
 {
     // Volume should depend on several factors: beat (strong, medium, weak) on which
     // this note is, phrase, on dynamics information, etc. For now, I'm going to
     // consider only beat information
     //
+
     // Volume depends on beat (strong, medium, weak) on which the note is placed.
+
+    float volume = 60;       // volume for off-beat notes
 
     if (!pTS)
         return 64;
-
+    
     int pos = get_beat_position(timePos, pTS, timeShift);
-
-    int volume = 60;       // volume for off-beat notes
-
+    
+    
     if (pos == 0)
         //on-beat notes on first beat
         volume = 85;
@@ -640,6 +690,32 @@ int SoundEventsTable::compute_volume(TimeUnits timePos, ImoTimeSignature* pTS,
         // off-beat notes
         volume = 60;
 
+    // the above just sets the default
+    // we override it below with dynamics from the score
+
+    if (track < m_pendingDynamics.size() && m_pendingDynamics[track] > 0.0f) {
+        // defined by being a % of forte (90 as midi velocity)
+        volume = 90.0f * m_pendingDynamics[track]*1e-2f; 
+    }
+    
+    float articScale = 1.0f;
+    // further adjust based on articulation information
+    
+    if (articulationType == k_articulation_stress) {
+        articScale = 1.1f;
+    }
+    else if (articulationType == k_articulation_accent) {
+        articScale = 1.2f;
+    }
+    else if (articulationType == k_articulation_marccato) {
+        articScale = 1.3f;
+    }
+    else if (articulationType == k_articulation_strong_accent) {
+        articScale = 1.35f;
+    }
+    
+    volume = std::min(127, std::max(1, (int) (volume * articScale)));
+    
     return volume;
 }
 

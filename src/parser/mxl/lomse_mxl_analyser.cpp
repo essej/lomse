@@ -310,6 +310,7 @@ enum EMxlTag
     k_mxl_tag_tied,
     k_mxl_tag_time,
     k_mxl_tag_time_modification,
+    k_mxl_tag_transpose,
     k_mxl_tag_tuplet,
     k_mxl_tag_tuplet_actual,
     k_mxl_tag_tuplet_normal,
@@ -1842,6 +1843,7 @@ public:
         vector<ImoObj*> times;
         vector<ImoObj*> keys;
         vector<ImoObj*> clefs;
+        vector<ImoObj*> transposes;
 
         //TODO
         // %editorial;
@@ -1890,7 +1892,7 @@ public:
 
         // transpose*
         while (get_optional("transpose"))
-            ; //TODO <transpose>
+            transposes.push_back(m_pAnalyser->analyse_node(&m_childToAnalyse, nullptr)); //TODO <transpose>
 
         // directive*
         while (get_optional("directive"))
@@ -2431,6 +2433,36 @@ protected:
 //        }
 //    }
 
+};
+
+//@--------------------------------------------------------------------------------------
+//@ <transpose>
+class TransposeMxlAnalyser : public MxlElementAnalyser
+{
+public:
+    TransposeMxlAnalyser(MxlAnalyser* pAnalyser, ostream& reporter,
+                            LibraryScope& libraryScope, ImoObj* pAnchor)
+        : MxlElementAnalyser(pAnalyser, reporter, libraryScope, pAnchor) {}
+
+    ImoObj* do_analysis()
+    {
+        ImoInstrument* pInstr = m_pAnalyser->get_current_instrument();
+        int trans = 0;
+        if (get_optional("diatonic"))
+            ; 
+
+        if (get_mandatory("chromatic"))
+            trans = get_child_value_integer(0);
+
+        if (get_optional("octave-change"))
+            trans += 12 * get_child_value_integer(0);
+
+        if (get_optional("double"))
+            ; 
+        
+        pInstr->set_chromatic_transpose(trans);
+        return nullptr;
+    }
 };
 
 //@--------------------------------------------------------------------------------------
@@ -4176,37 +4208,47 @@ public:
         error_if_more_elements();
 
         add_to_model(pNR);
-        add_to_spanners(pNote);
+        
+        if (pNote) {
+            add_to_spanners(pNote);
+        }
 
         //deal with notes in chord
         if (!fIsRest && fInChord)
         {
             ImoNote* pPrevNote = m_pAnalyser->get_last_note();
-            ImoChord* pChord;
-            if (pPrevNote->is_in_chord())
-            {
-                //chord already created. just add note to it
-                pChord = pPrevNote->get_chord();
+            if (pPrevNote) {
+                
+                ImoChord* pChord;
+                if (pPrevNote->is_in_chord())
+                {
+                    //chord already created. just add note to it
+                    pChord = pPrevNote->get_chord();
+                }
+                else
+                {
+                    //previous note is the base note. Create the chord
+                    pChord = static_cast<ImoChord*>(ImFactory::inject(k_imo_chord, pDoc));
+                    pPrevNote->include_in_relation(pDoc, pChord);
+                }
+                
+                //add current note to chord
+                pNote->include_in_relation(pDoc, pChord);
+                
+                //        //TODO: check if note in chord has the same duration than base note
+                //      //  if (fInChord && m_pLastNote
+                //      //      && !IsEqualTime(m_pLastNote->GetDuration(), rDuration) )
+                //      //  {
+                //      //      report_msg("Error: note in chord has different duration than base note. Duration changed.");
+                //		    //rDuration = m_pLastNote->GetDuration();
+                //      //      nNoteType = m_pLastNote->GetNoteType();
+                //      //      nDots = m_pLastNote->GetNumDots();
+                //      //  }
             }
-            else
-            {
-                //previous note is the base note. Create the chord
-                pChord = static_cast<ImoChord*>(ImFactory::inject(k_imo_chord, pDoc));
-                pPrevNote->include_in_relation(pDoc, pChord);
+            else {
+                LOMSE_LOG_ERROR("pPrevNote is nullptr when chord element found");
+                error_msg("No previous note when chord element found. Ignored.");
             }
-
-            //add current note to chord
-            pNote->include_in_relation(pDoc, pChord);
-
-//        //TODO: check if note in chord has the same duration than base note
-//      //  if (fInChord && m_pLastNote
-//      //      && !IsEqualTime(m_pLastNote->GetDuration(), rDuration) )
-//      //  {
-//      //      report_msg("Error: note in chord has different duration than base note. Duration changed.");
-//		    //rDuration = m_pLastNote->GetDuration();
-//      //      nNoteType = m_pLastNote->GetNoteType();
-//      //      nDots = m_pLastNote->GetNumDots();
-//      //  }
         }
 
         //save this note as last note
@@ -7334,6 +7376,7 @@ MxlAnalyser::MxlAnalyser(ostream& reporter, LibraryScope& libraryScope, Document
     m_NameToEnum["tied"] = k_mxl_tag_tied;
     m_NameToEnum["time"] = k_mxl_tag_time;
     m_NameToEnum["time-modification"] = k_mxl_tag_time_modification;
+    m_NameToEnum["transpose"] = k_mxl_tag_transpose;
     m_NameToEnum["tuplet"] = k_mxl_tag_tuplet;
     m_NameToEnum["tuplet-actual"] = k_mxl_tag_tuplet_actual;
     m_NameToEnum["tuplet-normal"] = k_mxl_tag_tuplet_normal;
@@ -7866,6 +7909,7 @@ MxlElementAnalyser* MxlAnalyser::new_analyser(const string& name, ImoObj* pAncho
         case k_mxl_tag_tied:                 return LOMSE_NEW TiedMxlAnalyser(this, m_reporter, m_libraryScope, pAnchor);
         case k_mxl_tag_time:                 return LOMSE_NEW TimeMxlAnalyser(this, m_reporter, m_libraryScope, pAnchor);
         case k_mxl_tag_time_modification:    return LOMSE_NEW TimeModificationXmlAnalyser(this, m_reporter, m_libraryScope, pAnchor);
+        case k_mxl_tag_transpose:            return LOMSE_NEW TransposeMxlAnalyser(this, m_reporter, m_libraryScope, pAnchor);
         case k_mxl_tag_tuplet:               return LOMSE_NEW TupletMxlAnalyser(this, m_reporter, m_libraryScope, pAnchor);
         case k_mxl_tag_tuplet_actual:        return LOMSE_NEW TupletNumbersMxlAnalyser(this, m_reporter, m_libraryScope, pAnchor);
         case k_mxl_tag_tuplet_normal:        return LOMSE_NEW TupletNumbersMxlAnalyser(this, m_reporter, m_libraryScope, pAnchor);

@@ -101,7 +101,7 @@ class SoundEvent
 public:
     SoundEvent(TimeUnits rTime, int nEventType, int nChannel,
                MidiPitch midiPitch, int nVolume, int nStep,
-               ImoStaffObj* pStaffObj, int nMeasure)
+               ImoStaffObj* pStaffObj, int nMeasure, int nTrack)
         : DeltaTime(long(rTime + 0.5f))
         , EventType(nEventType)
         , Channel(nChannel)
@@ -110,6 +110,7 @@ public:
         , Volume(nVolume)
         , pSO(pStaffObj)
         , Measure(nMeasure)
+        , Track(nTrack)
     {
     }
     SoundEvent(TimeUnits rTime, int nEventType, JumpEntry* pJumpEntry, int nMeasure)
@@ -121,6 +122,7 @@ public:
         , Volume(0)
         , pJump(pJumpEntry)
         , Measure(nMeasure)
+        , Track(-1)
     {
     }
     ~SoundEvent() {}
@@ -133,6 +135,8 @@ public:
         k_note_off,             //sound off
         k_visual_off,           //remove visual highlight. No effect on sound
         k_rhythm_change,        //change in rhythm (time signature)
+        k_tempo_change,         //change in tempo
+        k_dynamics_change,      //change in dynamics
         k_jump,                 //jump in playback (repetition mark, volta bracket,...)
         k_note_on,              //sound on
         k_visual_on,            //add visual highlight. No effect on sound
@@ -146,6 +150,7 @@ public:
         int     NotePitch;      //k_note_xxx: MIDI pitch
         int     Instrument;     //k_prog_instr: MIDI instrument
         int     TopNumber;      //k_rhythm_change: top number of TS
+        int     MicrosecPerQuarterNote;  // k_tempo_change : tempo as microseconds per quarter note
     };
     union {
         int     NoteStep;       //k_note_xxx: Note step 0..6 : 0-Do, ... 6-Si
@@ -160,7 +165,7 @@ public:
         JumpEntry*      pJump;      //jump entry, for playback jumps
     };
     int             Measure;    //measure number containing this staffobj
-
+    int             Track;      // instrument/track index
 };
 
 //---------------------------------------------------------------------------------------
@@ -173,12 +178,14 @@ protected:
     vector<SoundEvent*> m_events;
     vector<int> m_measures;
     vector<int> m_channels;
+    vector<int> m_transposes;
     vector<JumpEntry*> m_jumps;
     vector< pair<int, string> > m_targets;          //pair measure, label
     vector<JumpEntry*> m_pendingLabel;              //jumps to be fixed
     TimeUnits rAnacrusisMissingTime;
     int m_accidentals[7];
-
+    vector<float> m_pendingDynamics;  // for each instrument keeps track of current dynamics indications as events being generated
+    
 public:
     SoundEventsTable(ImoScore* pScore);
     virtual ~SoundEventsTable();
@@ -204,7 +211,7 @@ public:
 
 protected:
     void store_event(TimeUnits rTime, int eventType, int channel, MidiPitch pitch,
-                     int volume, int step, ImoStaffObj* pSO, int measure);
+                     int volume, int step, ImoStaffObj* pSO, int measure, int track);
     void store_jump_event(TimeUnits rTime, JumpEntry* pJump, int measure);
     void program_sounds_for_instruments();
     void create_events();
@@ -216,17 +223,17 @@ protected:
     void add_events_to_jumps();
     void replace_label_in_jumps();
     int find_measure_for_label(const string& label);
-    void add_noterest_events(StaffObjsCursor& cursor, int channel, int measure);
-    void add_rythm_change(StaffObjsCursor& cursor, int measure, ImoTimeSignature* pTS);
+    void add_noterest_events(StaffObjsCursor& cursor, int channel, int measure, int transpose=0, int track = -1);
+    void add_rythm_change(StaffObjsCursor& cursor, int measure, ImoTimeSignature* pTS, int track=-1);
     void add_jump(StaffObjsCursor& cursor, int measure, JumpEntry* pJump);
     void delete_events_table();
-    int compute_volume(TimeUnits timePos, ImoTimeSignature* pTS, TimeUnits timeShift);
+    int compute_volume(TimeUnits timePos, ImoTimeSignature* pTS, TimeUnits timeShift, int articulationType, int track);
     void reset_accidentals(ImoKeySignature* pKey);
     void update_context_accidentals(ImoNote* pNote);
     JumpEntry* create_jump(int jumpTo, int timesValid, int timesBefore=0);
     void process_sound_change(ImoSoundChange* pSound, StaffObjsCursor& cursor,
                               int channel, int iInstr, int measure);
-
+    void add_tempo_change(StaffObjsCursor& cursor, int measure, double tempo);
 
     //debug
     string dump_events_table();

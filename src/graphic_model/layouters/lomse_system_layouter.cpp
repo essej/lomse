@@ -188,7 +188,7 @@ void SystemLayouter::engrave_system(LUnits indent, int iFirstCol, int iLastCol,
     move_staves_to_avoid_collisions();
     engrave_instrument_details();
     add_instruments_info();
-
+    
     add_initial_line_joining_all_staves_in_system();
 }
 
@@ -225,20 +225,24 @@ void SystemLayouter::create_vertical_profile()
 
     delete m_pVProfile;
     m_pVProfile = LOMSE_NEW VerticalProfile(xStart, xEnd, numStaves);
-
+    
     //initialize the profile with the position of each staff
     int numInstrs = m_pScore->get_num_instruments();
     for (int iInstr = 0; iInstr < numInstrs; iInstr++)
     {
         InstrumentEngraver* pInstrEngraver = m_pPartsEngraver->get_engraver_for(iInstr);
+        pInstrEngraver->reset_shifts();
+        
         for (int iStaff=0; iStaff < pInstrEngraver->get_num_staves(); iStaff++)
         {
             LUnits yTop = pInstrEngraver->get_top_line_of_staff(iStaff);
             LUnits yBottom = pInstrEngraver->get_bottom_line_of_staff(iStaff);
             int idxStaff = m_pScoreMeter->staff_index(iInstr, iStaff);
             m_pVProfile->initialize(idxStaff, yTop, yBottom);
+            //fprintf(stderr, "Vprof MSS %d   top: %7.1f  bot: %7.1f  height: %7.1f  orig: %6.1f\n", idxStaff, yTop, yBottom, yBottom - yTop, pInstrEngraver->get_slice_instr_origin().y);
         }
     }
+    
 }
 
 //---------------------------------------------------------------------------------------
@@ -678,17 +682,29 @@ void SystemLayouter::move_staves_to_avoid_collisions()
             heights[i-1] = -distance;
             for (int j=i; j < numStaves; ++j)
                 yOrgShifts[j] -= distance;
+
         }
     }
 
+    /*
+    for (int i=0; i < numStaves; ++i) {
+        fprintf(stderr, "MSS: %d  height: %7g  yshift: %7g \n", i, heights[i], yOrgShifts[i]);    
+        //cerr << "   MSS min: " << m_pVProfile->dump_min(i) << endl;
+        //cerr << "   MSS max: " << m_pVProfile->dump_max(i) << endl;
+    }
+     */
+    
     //shift staves
     //- reposition staves in each instrument and group engraver
     //- reposition instrSlice boxes and recompute its height
     //- shift all shapes inside staffSlice boxes
     reposition_staves_in_engravers(yOrgShifts);
 
-    if (yOrgShifts[numStaves - 1] > 0.0f)
+    if (yOrgShifts[numStaves - 1] > 0.0f) {
         reposition_slice_boxes_and_shapes(yOrgShifts, heights);
+        // repos debug shapes
+        //m_pVProfile->reposition_debug_shapes(m_pBoxSystem, yOrgShifts);
+    }
 
 }
 
@@ -848,8 +864,10 @@ void SystemLayouter::engrave_attached_object(ImoObj* pAR, PendingAuxObjs* pPAO,
                                                       idxStaff, m_pVProfile);
 
             GmoShape* pAuxShape = m_pShapesCreator->create_last_shape(pRO);
-            add_last_rel_shape_to_model(pAuxShape, pRO, GmoShape::k_layer_aux_objs,
-                                        iCol, iInstr, iStaff, idxStaff);
+            if (pAuxShape) {
+                add_last_rel_shape_to_model(pAuxShape, pRO, GmoShape::k_layer_aux_objs,
+                                            iCol, iInstr, iStaff, idxStaff);
+            }
         }
 
         //normal cases: start and end in different objects
@@ -871,8 +889,10 @@ void SystemLayouter::engrave_attached_object(ImoObj* pAR, PendingAuxObjs* pPAO,
                                                       iLine, prologWidth, pInstr,
                                                       idxStaff, m_pVProfile);
             GmoShape* pAuxShape = m_pShapesCreator->create_last_shape(pRO);
-            add_last_rel_shape_to_model(pAuxShape, pRO, GmoShape::k_layer_aux_objs,
-                                        iCol, iInstr, iStaff, idxStaff);
+            if (pAuxShape) {
+                add_last_rel_shape_to_model(pAuxShape, pRO, GmoShape::k_layer_aux_objs,
+                                            iCol, iInstr, iStaff, idxStaff);
+            }
 
             //remove from pending RelObjs
             list<PendingRelObj>::iterator itR;

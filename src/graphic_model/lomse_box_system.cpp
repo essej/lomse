@@ -213,6 +213,12 @@ LUnits GmoBoxSystem::get_x_for_barline_at_time(TimeUnits timepos)
     return m_pGridTable->get_x_for_barline_at_time(timepos);
 }
 
+void GmoBoxSystem::get_bounds_for_measure_at_time(TimeUnits timepos, LUnits * xLeft, LUnits * xRight)
+{
+    m_pGridTable->get_bounds_for_measure_at_time(timepos, xLeft, xRight);    
+}
+
+
 //---------------------------------------------------------------------------------------
 string GmoBoxSystem::dump_timegrid_table()
 {

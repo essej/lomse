@@ -287,6 +287,24 @@ GmoShapeStaff* GraphicModel::get_shape_for_first_staff_in_first_system(ImoId sco
 }
 
 //---------------------------------------------------------------------------------------
+GmoBoxSystem* GraphicModel::get_last_system_box(ImoId scoreId)
+{
+    ScoreStub* pStub = get_stub_for(scoreId);
+    GmoBoxScorePage* pPage = pStub->get_pages().empty() ? nullptr : pStub->get_pages().back();
+    if (pPage)
+    {
+        GmoBoxSystem* pSystem = nullptr;
+        int i = pPage->get_num_first_system();
+        int maxSystem = pPage->get_num_systems() + i;        
+        pSystem = pPage->get_system(maxSystem-1);
+        return pSystem;
+    }
+    
+    return nullptr;
+}
+
+
+//---------------------------------------------------------------------------------------
 GmoBoxSystem* GraphicModel::get_system_for(ImoId scoreId, TimeUnits timepos)
 {
     //if not found returns nullptr

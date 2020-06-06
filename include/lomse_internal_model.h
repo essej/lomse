@@ -5030,6 +5030,7 @@ protected:
     ImoScoreText m_name;
     ImoScoreText m_abbrev;
     std::list<ImoInstrument*> m_instruments;
+    std::list<ImoInstrument*> m_activeInstruments;
 
     friend class ImFactory;
     ImoInstrGroup();
@@ -5085,22 +5086,29 @@ public:
     }
 
     //instruments
+    // jlc the getters only return active ones
+    
     inline list<ImoInstrument*>& get_instruments()
     {
-        return m_instruments;
+        return m_activeInstruments;
+        //return m_instruments;
     }
     void add_instrument(ImoInstrument* pInstr);
     ImoInstrument* get_instrument(int iInstr);   //0..n-1
     int get_num_instruments();
     ImoInstrument* get_first_instrument()
     {
-        return m_instruments.front();
+        //return m_instruments.front();
+        return m_activeInstruments.front();
     }
     ImoInstrument* get_last_instrument()
     {
-        return m_instruments.back();
+        //return m_instruments.back();
+        return m_activeInstruments.back();
     }
 
+    void rebuild_active_instruments();
+    
     //info
     inline ImoScore* get_score()
     {
@@ -5132,7 +5140,9 @@ protected:
     ImoScoreText    m_abbrev;
     string          m_partId;
     std::list<ImoStaffInfo*> m_staves;
-
+    int             m_chromaticTranspose;
+    bool            m_active;
+    
     //layout options
     int     m_barlineLayout;        //from enum EBarlineLayout
     int     m_measuresNumbering;    //from enum EMeasuresNumbering
@@ -5165,7 +5175,9 @@ public:
     inline const string& get_instr_id() const { return m_partId; }
     inline ImMeasuresTable* get_measures_table() const { return m_pMeasures; }
     inline TypeMeasureInfo* get_last_measure_info() { return m_pLastMeasureInfo; }
-
+    inline int get_chromatic_transpose() const { return m_chromaticTranspose; }
+    inline bool get_active() const { return m_active; }
+    
     //setters
     ImoStaffInfo* add_staff();
     void set_name(ImoScoreText* pText);
@@ -5175,6 +5187,8 @@ public:
     void replace_staff_info(ImoStaffInfo* pInfo);
     inline void set_instr_id(const string& id) { m_partId = id; }
     inline void set_last_measure_info(TypeMeasureInfo* pInfo) { m_pLastMeasureInfo = pInfo; }
+    inline void set_chromatic_transpose(int value) { m_chromaticTranspose = value; }
+    inline void set_active(bool flag) { m_active = flag; }
 
         //layout options
 
@@ -6046,6 +6060,7 @@ protected:
     ImoPageInfo     m_pageInfo;
     list<ImoScoreTitle*> m_titles;
     map<string, ImoStyle*> m_nameToStyle;
+    std::list<ImoInstrument*> m_activeInstruments; // jlc
 
     friend class ImFactory;
     ImoScore(Document* pDoc);
@@ -6091,6 +6106,16 @@ public:
     ImoInstruments* get_instruments();
     int get_instr_number_for(ImoInstrument* pInstr);
 
+    // this actually changes whether the underlying instruments are active
+    // only the active ones are returned from the methods above (and changing instrument groups)
+    // this allows for making only certain instruments visible, but not having to change the model
+    ImoInstrument* get_instrument_actual(int iInstr);   //0..n-1
+    int get_num_instruments_actual();
+    void set_instrument_actual_active(int iInstr, bool active);
+    bool get_instrument_actual_active(int iInstr);
+    int get_instr_actual_number_for(ImoInstrument* pInstr);
+    
+    
     //instrument groups
     void add_instruments_group(ImoInstrGroup* pGroup);
     ImoInstrGroups* get_instrument_groups();
@@ -6149,7 +6174,8 @@ protected:
     ImoStyle* create_default_style();
     void set_defaults_for_system_info();
     void set_defaults_for_options();
-
+    void rebuild_active_instruments();
+    
     friend class ScoreLdpGenerator;
     inline map<std::string, ImoStyle*>& get_styles()
     {

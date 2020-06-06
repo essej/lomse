@@ -427,6 +427,22 @@ DiatonicPitch Interactor::get_pitch_at(Pixels x, Pixels y)
 {
     //What would be the pitch if a note is inserted at received point?
 
+    DiatonicPitch pitch(k_no_pitch);
+    TimeUnits atTime = -1.0;
+    
+    get_pitch_and_time_at(x, y, pitch, atTime);
+    
+    return pitch;    
+}
+
+//---------------------------------------------------------------------------------------
+bool Interactor::get_pitch_and_time_at(Pixels x, Pixels y, DiatonicPitch & retPitch, TimeUnits & retTime)
+{
+    //What would be the pitch and time be if a note is inserted at received point?
+
+    retTime = -1;
+    retPitch = DiatonicPitch(k_no_pitch);
+    
     GraphicView* pGView = dynamic_cast<GraphicView*>(m_pView);
     if (pGView == nullptr)
     {
@@ -434,13 +450,13 @@ DiatonicPitch Interactor::get_pitch_at(Pixels x, Pixels y)
         LOMSE_LOG_ERROR(msg);
         throw runtime_error(msg);
     }
-
+    
     double xPos = double(x);
     double yPos = double(y);
     int iPage = page_at_screen_point(xPos, yPos);
     if (iPage == -1)
-        return DiatonicPitch(k_no_pitch);
-
+        return false;
+    
     screen_point_to_page_point(&xPos, &yPos);
     GraphicModel* pGM = get_graphic_model();
     AreaInfo* pInfo = pGM->get_info_for_point(iPage, LUnits(xPos), LUnits(yPos));
@@ -448,38 +464,42 @@ DiatonicPitch Interactor::get_pitch_at(Pixels x, Pixels y)
     {
         //determine position on staff
         int lineSpace = pInfo->pShapeStaff->line_space_at(LUnits(yPos));     //0=first ledger line below staff
-
+        
         //determine instrument, staff and timepos
-        GmoObj* pGmo = pInfo->pGmo;
+        GmoObj* pGmo = pInfo->pShapeStaff; //pInfo->pGmo;
         ImoObj* pImo = pGmo->get_creator_imo();
         DocCursorState state = pGView->click_event_to_cursor_state(iPage, LUnits(xPos),
-                                                                LUnits(yPos), pImo, pGmo);
+                                                                   LUnits(yPos), pImo, pGmo);
         if (state.get_parent_level_id() != k_no_imoid)
         {
             SpScoreCursorState pState(
-                static_pointer_cast<ScoreCursorState>(state.get_delegate_state()) );
+                                      static_pointer_cast<ScoreCursorState>(state.get_delegate_state()) );
             int staff = pState->staff();
             int instr = pState->instrument();
             TimeUnits time = pState->time();
-
+            
+            retTime = time;
+            
             //determine clef
             ImoInstrument* pInstr = static_cast<ImoInstrument*>(
-                                        pInfo->pShapeStaff->get_creator_imo() );
+                                                                pInfo->pShapeStaff->get_creator_imo() );
             ImoScore* pScore = pInstr->get_score();
             EClef clef = EClef(
-                ScoreAlgorithms::get_applicable_clef_for(pScore, instr, staff, time) );
+                               ScoreAlgorithms::get_applicable_clef_for(pScore, instr, staff, time) );
             if (clef == k_clef_undefined || clef == k_clef_percussion)
                 return DiatonicPitch(k_no_pitch);
-
+            
             //determine pitch
             DiatonicPitch dp = get_diatonic_pitch_for_first_line(clef);
             dp += (lineSpace - 2);
-
-            return dp;
+            
+            retPitch = dp;
+            return true;
         }
     }
-    return DiatonicPitch(k_no_pitch);
+    return false;
 }
+
 
 //---------------------------------------------------------------------------------------
 void Interactor::task_action_mouse_in_out(Pixels x, Pixels y,
@@ -1274,6 +1294,72 @@ void Interactor::scroll_to_measure(ImoId scoreId, int iMeasure, TimeUnits locati
         }
     }
 }
+
+//---------------------------------------------------------------------------------------
+bool Interactor::get_pixel_bounds_for_tempo_line(ImoId scoreId, int iMeasure,
+                                                 TimeUnits location, int iInstr, Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight)
+{
+    GraphicView* pGView = dynamic_cast<GraphicView*>(m_pView);
+    if (pGView)
+    {
+        ImoObj* pScore = nullptr;
+        if (SpDocument spDoc = m_wpDoc.lock())
+            pScore = spDoc->get_pointer_to_imo(scoreId);
+
+        if (pScore && pScore->is_score())
+        {
+            ImoScore* score = static_cast<ImoScore*>(pScore);
+            MeasureLocator ml(iInstr, iMeasure, location);
+            TimeUnits timepos = ScoreAlgorithms::get_timepos_for(score, ml);
+            pGView->get_pixel_bounds_for_tempo_line(scoreId, timepos, xPos, yPos, xWidth, yHeight);
+            return true;
+        }
+    }
+    return false;
+}
+
+//---------------------------------------------------------------------------------------
+bool Interactor::get_pixel_bounds_for_measure_at(ImoId scoreId, int iMeasure,
+                                                 TimeUnits location, int iInstr, Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight)
+{
+    GraphicView* pGView = dynamic_cast<GraphicView*>(m_pView);
+    if (pGView)
+    {
+        ImoObj* pScore = nullptr;
+        if (SpDocument spDoc = m_wpDoc.lock())
+            pScore = spDoc->get_pointer_to_imo(scoreId);
+
+        if (pScore && pScore->is_score())
+        {
+            ImoScore* score = static_cast<ImoScore*>(pScore);
+            MeasureLocator ml(iInstr, iMeasure, location);
+            TimeUnits timepos = ScoreAlgorithms::get_timepos_for(score, ml);
+            pGView->get_pixel_bounds_for_measure_at(scoreId, timepos, xPos, yPos, xWidth, yHeight);
+            return true;
+        }
+    }
+    return false;
+}
+
+//---------------------------------------------------------------------------------------
+bool Interactor::get_pixel_size_for_entire_score(ImoId scoreId, Pixels* xWidth, Pixels* yHeight)
+{
+    GraphicView* pGView = dynamic_cast<GraphicView*>(m_pView);
+    if (pGView)
+    {
+        ImoObj* pScore = nullptr;
+        if (SpDocument spDoc = m_wpDoc.lock())
+            pScore = spDoc->get_pointer_to_imo(scoreId);
+
+        if (pScore && pScore->is_score())
+        {
+            ImoScore* score = static_cast<ImoScore*>(pScore);
+            return pGView->get_pixel_size_for_entire_score(scoreId,  xWidth, yHeight);
+        }
+    }
+    return false;    
+}
+
 
 //---------------------------------------------------------------------------------------
 void Interactor::highlight_object(ImoStaffObj* pSO)

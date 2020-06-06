@@ -121,6 +121,12 @@ public:
     */
     LUnits get_x_for_barline_at_time(TimeUnits timepos);
 
+    /**
+     
+     */
+    void get_bounds_for_measure_at_time(TimeUnits timepos, LUnits * xLeft, LUnits * xRight);
+
+    
     //debug
     string dump();
 

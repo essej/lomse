@@ -89,6 +89,8 @@ public:
     Presenter* open_document(int viewType, LdpReader& reader,
                              ostream& reporter = cout);
 
+    void add_interactor(int viewType, Presenter* pPresenter);
+
 };
 ///@endcond
 
@@ -144,6 +146,16 @@ public:
     */
     WpInteractor get_interactor(int iIntor);
 
+    /** Adds additional interactor to collection of interactors we manage
+     @param pIntor is the interactor to add.  
+     */
+    int add_interactor(Interactor * pIntor);
+
+    /** Removes any interactors from collection of interactors we manage
+     Will never remove the only one left.
+     @param pIntor is the interactor to remove
+     */
+    bool remove_interactor(int iIntor);
 
     //accessors
     /** Returns a shared pointer to the Document associated to this %Presenter.    */

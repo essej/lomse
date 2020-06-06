@@ -170,9 +170,11 @@ public:
     void set_staves_horizontal_position(LUnits x, LUnits width, LUnits indent);
     LUnits set_staves_vertical_position(LUnits y);
     inline void set_slice_instr_origin(UPoint org) { m_org = org; }
+    inline UPoint get_slice_instr_origin() { return m_org;}
     inline void set_staves_width(LUnits width) { m_stavesWidth = width; }
     void reposition_staff(int iStaff, LUnits yShift);
-
+    void reset_shifts();
+    
     //indents
     void measure_name_and_bracket();
     URect get_box_for_bracket() { return m_bracketFirstBox; }

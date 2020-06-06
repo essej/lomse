@@ -138,8 +138,9 @@ protected:
     int m_nContour;                 //current countour
     agg::trans_affine   m_trans;    //affine transformation to apply
 
-
 public:
+    int staff_index;
+
     GmoShapeDebug(Color color=Color(0,0,0), UPoint uPos=UPoint(0.0f, 0.0f),
                   USize uSize=USize(1000.0f, 1000.0f));
 
@@ -147,6 +148,7 @@ public:
     virtual void add_vertex(Vertex& vertex);
     virtual void add_vertex(char cmd, LUnits x, LUnits y);
     virtual void close_vertex_list();
+    virtual void reposition_shape(LUnits yShift) override;
 
     //VertexSource
     unsigned vertex(double* px, double* py) override;

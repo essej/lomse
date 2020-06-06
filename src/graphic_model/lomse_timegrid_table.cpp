@@ -193,6 +193,45 @@ LUnits TimeGridTable::get_x_for_barline_at_time(TimeUnits timepos)
     return m_PosTimes.back().uxPos;       //<--------------------------- Test 203
 }
 
+void TimeGridTable::get_bounds_for_measure_at_time(TimeUnits timepos, LUnits * xLeft, LUnits * xRight)
+{
+    //xPos = 0 if table is empty or timepos < first entry timepos
+    if (m_PosTimes.size() == 0 || is_lower_time(timepos, m_PosTimes.front().rTimepos)) {
+        if (xLeft) *xLeft = 0.0;       //<--------------------------- Test 203
+        if (xRight) *xRight = 0.0;       //<--------------------------- Test 203
+        return;       //<--------------------------- Test 200
+    }
+
+    //otherwise find in table
+    vector<TimeGridTableEntry>::iterator it = m_PosTimes.begin();
+    TimeUnits prevTimepos = (*it).rTimepos;
+    LUnits xPrev = (*it).uxPos;
+
+    for (; it != m_PosTimes.end(); ++it)
+    {
+        //if (is_equal_time(timepos, (*it).rTimepos))//<--------------- Test 201 (case =)
+        //    return (*it).uxPos;
+        if (is_lower_time(timepos, (*it).rTimepos))//<---------- Test 202 (case <)
+        {
+            //interpolate
+            //double dx = double((*it).uxPos - xPrev) / double((*it).rTimepos - prevTimepos);            
+            //xPrev + LUnits( double(timepos - prevTimepos) * dx );
+            if (xLeft) *xLeft = xPrev;
+            if (xRight) *xRight = (*it).uxPos;
+            return;
+        }
+
+        prevTimepos = (*it).rTimepos;
+        xPrev = (*it).uxPos;
+    }
+
+    //if not found return last entry xPos. Or should return system xRight?
+    if (xLeft) *xLeft = m_PosTimes.back().uxPos;       //<--------------------------- Test 203
+    if (xRight) *xRight = m_PosTimes.back().uxPos;       //<--------------------------- Test 203
+    return;
+}
+
+
 //---------------------------------------------------------------------------------------
 TimeUnits TimeGridTable::start_time()
 {

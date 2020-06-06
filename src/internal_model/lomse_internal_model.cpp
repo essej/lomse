@@ -2500,6 +2500,8 @@ ImoInstrument::ImoInstrument()
     , m_name()
     , m_abbrev()
     , m_partId("")
+    , m_chromaticTranspose(0)
+    , m_active(true)
     , m_barlineLayout(EBarlineLayout::k_isolated)
     , m_measuresNumbering(EMeasuresNumbering::k_none)
     , m_pMeasures(nullptr)
@@ -2871,12 +2873,27 @@ void ImoInstrGroup::set_abbrev(ImoScoreText* pText)
 }
 
 //---------------------------------------------------------------------------------------
+void ImoInstrGroup::rebuild_active_instruments()
+{
+    m_activeInstruments.clear();
+    
+    std::list<ImoInstrument*>::iterator it;
+    for (it = m_instruments.begin(); it != m_instruments.end(); ++it)
+    {
+        if ((*it)->get_active()) {
+            m_activeInstruments.push_back(*it);
+        }
+    }    
+}
+
+
+//---------------------------------------------------------------------------------------
 ImoInstrument* ImoInstrGroup::get_instrument(int iInstr)    //iInstr = 0..n-1
 {
     std::list<ImoInstrument*>::iterator it;
     int i = 0;
-    for (it = m_instruments.begin(); it != m_instruments.end() && i < iInstr; ++it, ++i);
-    if (i == iInstr && it != m_instruments.end())
+    for (it = m_activeInstruments.begin(); it != m_activeInstruments.end() && i < iInstr; ++it, ++i);
+    if (i == iInstr && it != m_activeInstruments.end())
         return *it;
     else
         return nullptr;
@@ -2886,12 +2903,15 @@ ImoInstrument* ImoInstrGroup::get_instrument(int iInstr)    //iInstr = 0..n-1
 void ImoInstrGroup::add_instrument(ImoInstrument* pInstr)
 {
     m_instruments.push_back(pInstr);
+    
+    rebuild_active_instruments();
 }
 
 //---------------------------------------------------------------------------------------
 int ImoInstrGroup::get_num_instruments()
 {
-    return static_cast<int>( m_instruments.size() );
+    //return static_cast<int>( m_instruments.size() );
+    return static_cast<int>( m_activeInstruments.size() );
 }
 
 //=======================================================================================
@@ -3450,8 +3470,16 @@ ImoInstruments* ImoScore::get_instruments()
 //---------------------------------------------------------------------------------------
 ImoInstrument* ImoScore::get_instrument(int iInstr)    //iInstr = 0..n-1
 {
-    ImoInstruments* pColInstr = get_instruments();
-    return dynamic_cast<ImoInstrument*>( pColInstr->get_child(iInstr) );
+    std::list<ImoInstrument*>::iterator it;
+    int i = 0;
+    for (it = m_activeInstruments.begin(); it != m_activeInstruments.end() && i < iInstr; ++it, ++i);
+    if (i == iInstr && it != m_activeInstruments.end())
+        return *it;
+    else
+        return nullptr;
+    
+    //ImoInstruments* pColInstr = get_instruments();
+    //return dynamic_cast<ImoInstrument*>( pColInstr->get_child(iInstr) );
 }
 
 //---------------------------------------------------------------------------------------
@@ -3471,6 +3499,70 @@ ImoInstrument* ImoScore::get_instrument(const string& partId)
 //---------------------------------------------------------------------------------------
 int ImoScore::get_instr_number_for(ImoInstrument* pInstr)
 {
+    int i=0;
+    std::list<ImoInstrument*>::iterator it;
+    for (it= m_activeInstruments.begin(); it != m_activeInstruments.end(); ++it, ++i)
+    {
+        if (*it == pInstr)
+            return i;
+    }
+    LOMSE_LOG_ERROR("[ImoScore::get_instr_number_for] pInstr not found!");
+    throw runtime_error("[ImoScore::get_instr_number_for] pInstr not found!");
+     
+}
+
+//---------------------------------------------------------------------------------------
+void ImoScore::add_instrument(ImoInstrument* pInstr, const string& partId)
+{
+    pInstr->set_owner_score(this);
+    if (pInstr->get_instr_id() == "")
+        pInstr->set_instr_id(partId);
+    ImoInstruments* pColInstr = get_instruments();
+    pColInstr->append_child_imo(pInstr);
+    rebuild_active_instruments();
+}
+
+//---------------------------------------------------------------------------------------
+int ImoScore::get_num_instruments()
+{
+    return static_cast<int>(m_activeInstruments.size());
+    //ImoInstruments* pColInstr = get_instruments();
+    //return pColInstr->get_num_children();
+}
+
+
+//---------------------------------------------------------------------------------------
+ImoInstrument* ImoScore::get_instrument_actual(int iInstr) 
+{
+    ImoInstruments* pColInstr = get_instruments();
+    return dynamic_cast<ImoInstrument*>( pColInstr->get_child(iInstr) );
+}
+
+//---------------------------------------------------------------------------------------
+int ImoScore::get_num_instruments_actual()
+{
+    ImoInstruments* pColInstr = get_instruments();
+    return pColInstr->get_num_children();
+}
+
+//---------------------------------------------------------------------------------------
+void ImoScore::set_instrument_actual_active(int iInstr, bool active)
+{
+    ImoInstrument* pInstr = get_instrument_actual(iInstr);
+    pInstr->set_active(active);
+
+    rebuild_active_instruments();
+}
+
+//---------------------------------------------------------------------------------------
+bool ImoScore::get_instrument_actual_active(int iInstr)
+{
+    ImoInstrument* pInstr = get_instrument_actual(iInstr);
+    return pInstr->get_active();
+}
+
+int ImoScore::get_instr_actual_number_for(ImoInstrument* pInstr)
+{
     ImoInstruments* pColInstr = get_instruments();
     int i=0;
     ImoObj::children_iterator it;
@@ -3483,22 +3575,32 @@ int ImoScore::get_instr_number_for(ImoInstrument* pInstr)
     throw runtime_error("[ImoScore::get_instr_number_for] pInstr not found!");
 }
 
-//---------------------------------------------------------------------------------------
-void ImoScore::add_instrument(ImoInstrument* pInstr, const string& partId)
-{
-    pInstr->set_owner_score(this);
-    if (pInstr->get_instr_id() == "")
-        pInstr->set_instr_id(partId);
-    ImoInstruments* pColInstr = get_instruments();
-    pColInstr->append_child_imo(pInstr);
-}
 
 //---------------------------------------------------------------------------------------
-int ImoScore::get_num_instruments()
+void ImoScore::rebuild_active_instruments()
 {
-    ImoInstruments* pColInstr = get_instruments();
-    return pColInstr->get_num_children();
+    // rebuild internal activeInstrument list
+    m_activeInstruments.clear();
+    int numActual = get_num_instruments_actual();
+    for (int i=0; i < numActual; ++i) {
+        ImoInstrument* pinstr = get_instrument_actual(i);
+        if (pinstr->get_active()) {
+            m_activeInstruments.push_back(pinstr);
+        }
+    }
+
+    // rebuild groups!
+    ImoInstrGroups* pGroups = get_instrument_groups();
+    if (pGroups) {
+        ImoObj::children_iterator it;
+        for (it= pGroups->begin(); it != pGroups->end(); ++it)
+        {
+            ImoInstrGroup* pGrp = static_cast<ImoInstrGroup*>(*it);
+            pGrp->rebuild_active_instruments();
+        }
+    }
 }
+
 
 //---------------------------------------------------------------------------------------
 ImoOptionInfo* ImoScore::get_option(const std::string& name)

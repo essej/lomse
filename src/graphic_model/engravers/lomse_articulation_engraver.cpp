@@ -252,7 +252,7 @@ void ArticulationEngraver::shift_shape_if_collision()
                                                  m_idxStaff);
         LUnits yMin = minValue.first;
         yMin -= m_pArticulationShape->get_height();
-        yMin -= (minValue.second->is_shape_notehead() ? spaceNotehead : spaceOther);
+        yMin -= (minValue.second && minValue.second->is_shape_notehead() ? spaceNotehead : spaceOther);
         m_pArticulationShape->set_top( min(yCurPos, yMin) );
     }
     else
@@ -262,7 +262,7 @@ void ArticulationEngraver::shift_shape_if_collision()
                                                  m_pArticulationShape->get_right(),
                                                  m_idxStaff);
         LUnits yMax = maxValue.first;
-        yMax += (maxValue.second->is_shape_notehead() ? spaceNotehead : spaceOther);
+        yMax += (maxValue.second && maxValue.second->is_shape_notehead() ? spaceNotehead : spaceOther);
         m_pArticulationShape->set_top( max(yCurPos, yMax) );
     }
 }

@@ -84,6 +84,7 @@ public:
     TimeUnits end_time();
     LUnits get_x_for_note_rest_at_time(TimeUnits timepos);
     LUnits get_x_for_barline_at_time(TimeUnits timepos);
+    void get_bounds_for_measure_at_time(TimeUnits timepos, LUnits * xLeft, LUnits * xRight);
 
 	//miscellaneous info
     GmoShapeStaff* get_staff_shape(int absStaff);

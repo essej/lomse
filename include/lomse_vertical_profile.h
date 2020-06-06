@@ -118,6 +118,7 @@ public:
 
     //debug
     void dbg_add_vertical_profile_shapes(GmoBox* pBoxSystem);
+    void reposition_debug_shapes(GmoBox* pBoxSystem, const vector<LUnits>& yOrgShifts); 
     std::string dump_max(int idxStaff);
     std::string dump_min(int idxStaff);
 

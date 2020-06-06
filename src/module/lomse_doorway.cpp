@@ -110,6 +110,13 @@ Presenter* LomseDoorway::open_document(int viewType, LdpReader& reader,
 }
 
 //---------------------------------------------------------------------------------------
+void LomseDoorway::add_interactor(int viewType, Presenter* pPresenter)
+{
+    PresenterBuilder builder(*m_pLibraryScope);
+    return builder.add_interactor(viewType, pPresenter);
+}
+
+//---------------------------------------------------------------------------------------
 void LomseDoorway::init_library(int pixel_format, int ppi, bool reverse_y_axis,
                                ostream& reporter)
 {

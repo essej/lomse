@@ -196,6 +196,7 @@ public:
     */
     GmoBoxSystem* get_system_for(ImoId scoreId, TimeUnits timepos);
     GmoBoxSystem* get_system_box(int iSystem);
+    GmoBoxSystem* get_last_system_box(ImoId scoreId);
 
     GmoBoxSystem* get_system_for_staffobj(ImoId id);
 

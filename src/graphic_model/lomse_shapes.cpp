@@ -387,7 +387,7 @@ void GmoShapeStem::set_stem_down(LUnits xLeft, LUnits yNote)
 //=======================================================================================
 GmoShapeDebug::GmoShapeDebug(Color color, UPoint uPos, USize uSize)
 	: GmoSimpleShape(nullptr, GmoObj::k_shape_debug, 0, color)
-    , m_nContour(0)
+    , m_nContour(0), staff_index(0)
 {
     rewind();
 
@@ -421,6 +421,14 @@ void GmoShapeDebug::add_vertex(char cmd, LUnits x, LUnits y)
     Vertex v = { x, y, aggCmd};
     m_vertices.push_back(v);
 }
+
+void GmoShapeDebug::reposition_shape(LUnits yShift)
+{
+    for (std::list<Vertex>::iterator it = m_vertices.begin(); it != m_vertices.end(); ++it) {
+        it->uy_coord += yShift;
+    }
+}
+
 
 //---------------------------------------------------------------------------------------
 void GmoShapeDebug::close_vertex_list()

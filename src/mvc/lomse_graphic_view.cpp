@@ -85,6 +85,10 @@ View* ViewFactory::create_view(LibraryScope& libraryScope, int viewType,
         case k_view_single_system:
             return LOMSE_NEW SingleSystemView(libraryScope, pDrawer);
 
+        case k_view_single_system_vertical:
+            return LOMSE_NEW SingleSystemVerticalView(libraryScope, pDrawer);
+
+            
         default:
         {
             LOMSE_LOG_ERROR("[ViewFactory::create_view] invalid view type");
@@ -316,8 +320,10 @@ void GraphicView::move_tempo_line_and_change_viewport(ImoId scoreId, TimeUnits t
 void GraphicView::do_move_tempo_line_and_change_viewport(ImoId scoreId, TimeUnits timepos,
                                                          bool fTempoLine, bool fViewport)
 {
-    if (!determine_page_system_and_position_for(scoreId, timepos))
+    if (!determine_page_system_and_position_for(scoreId, timepos)) {
+        m_pTempoLine->remove_tempo_line();
         return;
+    }
 
     if (fViewport)
         do_change_viewport_if_necessary();
@@ -327,7 +333,96 @@ void GraphicView::do_move_tempo_line_and_change_viewport(ImoId scoreId, TimeUnit
         m_pTempoLine->set_visible(true);
         m_pTempoLine->move_to(m_xScrollLeft, m_pScrollSystem, m_iScrollPage);
     }
+    else {
+        m_pTempoLine->remove_tempo_line();
+    }
 }
+
+void GraphicView::get_pixel_bounds_for_tempo_line(ImoId scoreId, TimeUnits timepos, 
+                                                  Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight)
+{
+    if (!determine_page_system_and_position_for(scoreId, timepos)) {
+        return;
+    }
+    
+    double xSliceLeft = double(m_xScrollLeft);
+    double xSliceRight = double(m_xScrollRight);
+    double yTop = double(m_pScrollSystem->get_top());
+    double yBottom = yTop + double(m_pScrollSystem->get_height());
+
+    //model point to screen returns shift from current viewport origin
+    model_point_to_screen(&xSliceLeft, &yTop, m_iScrollPage);
+    model_point_to_screen(&xSliceRight, &yBottom, m_iScrollPage);
+    
+    if (xPos) {
+        *xPos = xSliceLeft;
+    }
+    if (yPos) {
+        *yPos = yTop;
+    }
+    if (xWidth) {
+        *xWidth = xSliceRight - xSliceLeft;
+    }
+    if (yHeight) {
+        *yHeight = yBottom - yTop;
+    }
+}
+
+void GraphicView::get_pixel_bounds_for_measure_at(ImoId scoreId, TimeUnits timepos, 
+                                                  Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight)
+{
+    if (!determine_page_system_and_position_for(scoreId, timepos)) {
+        return;
+    }
+    
+    double xSliceLeft = double(m_xMeasLeft);
+    double xSliceRight = double(m_xMeasRight);
+    double yTop = double(m_pScrollSystem->get_top());
+    double yBottom = yTop + double(m_pScrollSystem->get_height());
+    
+    //model point to screen returns shift from current viewport origin
+    model_point_to_screen(&xSliceLeft, &yTop, m_iScrollPage);
+    model_point_to_screen(&xSliceRight, &yBottom, m_iScrollPage);
+    
+    if (xPos) {
+        *xPos = xSliceLeft;
+    }
+    if (yPos) {
+        *yPos = yTop;
+    }
+    if (xWidth) {
+        *xWidth = xSliceRight - xSliceLeft;
+    }
+    if (yHeight) {
+        *yHeight = yBottom - yTop;
+    }
+}
+
+bool GraphicView::get_pixel_size_for_entire_score(ImoId scoreId, Pixels* xWidth, Pixels* yHeight)
+{
+    GraphicModel* pGModel = get_graphic_model();
+    if (!pGModel)
+        return false;    //error
+
+    GmoBoxSystem* boxsystem = pGModel->get_last_system_box(scoreId);
+    if (boxsystem) {
+        double bottomY = boxsystem->get_bottom();
+        double rightX = boxsystem->get_right();
+        int pagenum = boxsystem->get_page_number();
+        
+        model_point_to_screen(&rightX, &bottomY, pagenum);
+        
+        if (xWidth) {
+            *xWidth = rightX;
+        }
+        if (yHeight) {
+            *yHeight = bottomY;
+        }
+        return true;
+    }
+    return false;
+}
+
 
 //---------------------------------------------------------------------------------------
 bool GraphicView::determine_page_system_and_position_for(ImoId scoreId, TimeUnits timepos)
@@ -351,6 +446,7 @@ bool GraphicView::determine_page_system_and_position_for(ImoId scoreId, TimeUnit
     m_iScrollPage = m_pScrollSystem->get_page_number();
     m_xScrollLeft = m_pScrollSystem->get_x_for_note_rest_at_time(timepos);
     m_xScrollRight = m_xScrollLeft + 1000;   //1 cm
+    m_pScrollSystem->get_bounds_for_measure_at_time(timepos, &m_xMeasLeft, &m_xMeasRight);
 
     //LOMSE_LOG_DEBUG(Logger::k_events, "new scroll pos = %f, %f", m_xScrollLeft, m_xScrollRight);
 
@@ -721,10 +817,14 @@ string GraphicView::get_caret_timecode()
 //---------------------------------------------------------------------------------------
 VisualEffect* GraphicView::get_tracking_effect(int effect)
 {
-    if ((m_trackingEffect & effect) && (effect == k_tracking_highlight_notes))
+    // allow access to the effect so it's properties can be changed
+    // regardless of current viewing state
+    //if ((m_trackingEffect & effect) && (effect == k_tracking_highlight_notes))
+    if (effect == k_tracking_highlight_notes)
         return m_pHighlighted;
 
-    if ((m_trackingEffect & effect) && (effect == k_tracking_tempo_line))
+    //if ((m_trackingEffect & effect) && (effect == k_tracking_tempo_line))
+    if (effect == k_tracking_tempo_line)
         return m_pTempoLine;
 
     return nullptr;
@@ -906,17 +1006,14 @@ void GraphicView::remove_highlight_from_object(ImoStaffObj* pSO)
 //---------------------------------------------------------------------------------------
 void GraphicView::remove_all_visual_tracking()
 {
-    if (m_trackingEffect & k_tracking_highlight_notes)
-    {
-        m_pHighlighted->set_visible(false);
-        m_pHighlighted->remove_all_highlight();
-    }
+    // hide and clear them all regardless of current state
+    // necessary to avoid dangling pointers
 
-    if (m_trackingEffect & k_tracking_tempo_line)
-    {
-        m_pTempoLine->set_visible(false);
-        m_pTempoLine->remove_tempo_line();
-    }
+    m_pHighlighted->set_visible(false);
+    m_pHighlighted->remove_all_highlight();
+
+    m_pTempoLine->set_visible(false);
+    m_pTempoLine->remove_tempo_line();
 }
 
 //---------------------------------------------------------------------------------------
@@ -1869,6 +1966,66 @@ bool SingleSystemView::is_valid_for_this_view(Document* pDoc)
     return pDoc->get_num_content_items() == 1
             && pDoc->get_content_item(0)->is_score();
 }
+
+
+
+//=======================================================================================
+// SingleSystemVerticalView implementation
+//=======================================================================================
+SingleSystemVerticalView::SingleSystemVerticalView(LibraryScope& libraryScope, ScreenDrawer* pDrawer)
+    : GraphicView(libraryScope, pDrawer)
+{
+}
+
+//---------------------------------------------------------------------------------------
+void SingleSystemVerticalView::collect_page_bounds()
+{
+    GraphicModel* pGModel = get_graphic_model();
+    UPoint origin(0.0f, 0.0f);
+
+    m_pageBounds.clear();
+    GmoBoxDocPage* pPage = pGModel->get_page(0);
+    URect rect = pPage->get_bounds();
+    UPoint bottomRight(origin.x+rect.width, origin.y+rect.height);
+    m_pageBounds.push_back( URect(origin, bottomRight) );
+}
+
+//---------------------------------------------------------------------------------------
+int SingleSystemVerticalView::page_at_screen_point(double UNUSED(x), double UNUSED(y))
+{
+    return 0;       //single system view is only one page
+}
+
+
+//---------------------------------------------------------------------------------------
+void SingleSystemVerticalView::set_viewport_for_page_fit_full(Pixels screenWidth)
+{
+    set_viewport_at_page_center(screenWidth);
+}
+
+//---------------------------------------------------------------------------------------
+void SingleSystemVerticalView::get_view_size(Pixels* xWidth, Pixels* yHeight)
+{
+    *xWidth = 0;
+    *yHeight = 0;
+
+    GraphicModel* pGModel = get_graphic_model();
+    if (pGModel && pGModel->get_num_pages() > 0)
+    {
+        GmoBoxDocPage* pPage = pGModel->get_page(0);
+        URect rect = pPage->get_bounds();
+        *xWidth = m_pDrawer->LUnits_to_Pixels(rect.width);
+        *yHeight = m_pDrawer->LUnits_to_Pixels(rect.height);
+    }
+}
+
+//---------------------------------------------------------------------------------------
+bool SingleSystemVerticalView::is_valid_for_this_view(Document* pDoc)
+{
+    return pDoc->get_num_content_items() == 1
+            && pDoc->get_content_item(0)->is_score();
+}
+
 
 
 }  //namespace lomse

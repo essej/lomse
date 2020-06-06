@@ -661,6 +661,21 @@ public:
     */
     DiatonicPitch get_pitch_at(Pixels x, Pixels y);
 
+    
+    /** Gets the pitch (@a DiatonicPitch type) and time (TimeUnits type) of the staff point pointed by
+    coordinates @a x, @a y or value @a k_no_pitch if not pointing to a staff. retTime will be set to -1 if not
+     pointing to an area in the staff, and the whole function will return false.
+
+    This helper method is useful in some scenarios. For instance, if in your
+    application the user is allowed to insert notes on a staff by clicking with the
+    mouse on the insertion point, you will need to determine the nearest staff
+    line/space, and the applicable clef, in order to determine the pitch for the
+    note to insert. This method performs all these operations and returns the
+    diatonic pitch for the staff point.
+     */
+    bool get_pitch_and_time_at(Pixels x, Pixels y, DiatonicPitch & retPitch, TimeUnits & retTime);
+    
+    
     //@}    //interface to GraphicView. Units conversion and related
 
 
@@ -1000,6 +1015,19 @@ public:
     virtual void move_tempo_line_and_scroll_if_necessary(ImoId scoreId, int iMeasure,
                                                          TimeUnits location, int iInstr=0);
 
+    /**     
+     */
+    virtual bool get_pixel_bounds_for_tempo_line(ImoId scoreId, int iMeasure,
+                                                 TimeUnits location, int iInstr, Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight);
+
+    /**     
+     */
+    virtual bool get_pixel_bounds_for_measure_at(ImoId scoreId, int iMeasure,
+                                                 TimeUnits location, int iInstr, Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight);
+
+    virtual bool get_pixel_size_for_entire_score(ImoId scoreId, Pixels* xWidth, Pixels* yHeight);
+
+    
     /** @param pSO This note or rest will be highlighted
         @todo Document Interactor::highlight_object    */
     virtual void highlight_object(ImoStaffObj* pSO);

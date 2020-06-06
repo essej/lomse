@@ -534,6 +534,9 @@ void ColumnsBuilder::determine_staves_vertical_position()
             yPos += m_pScoreLyt->determine_top_space(iInstr+1);
 
         m_SliceInstrHeights[iInstr] = yPos - yTop;
+        
+        //fprintf(stderr, "IEC:%d  H: %6g  T: %6g  B: %6g  \n", iInstr, m_SliceInstrHeights[iInstr], yTop, yPos);
+
     }
     m_stavesHeight = yPos;
 }

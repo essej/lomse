@@ -2929,9 +2929,14 @@ protected:
 
             ImoInstrGroup* pGrp = static_cast<ImoInstrGroup*>(*it);
             ImoInstrument* pInstr = pGrp->get_first_instrument();
-            m_source << pInstr->get_instr_id();
+            if (pInstr) {
+                m_source << pInstr->get_instr_id();
+            }
             pInstr = pGrp->get_last_instrument();
-            m_source << " " << pInstr->get_instr_id();
+            if (pInstr) {
+                m_source << " " << pInstr->get_instr_id();
+            }
+            
             bool fAddSpace = true;
 
             string value = pGrp->get_name_string();

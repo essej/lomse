@@ -110,6 +110,7 @@ enum EViewType {
     k_view_vertical_book,
     k_view_horizontal_book,
     k_view_single_system,
+    k_view_single_system_vertical,
 };
 
 ///@cond INTERNAL
@@ -272,6 +273,15 @@ public:
     */
     virtual void move_tempo_line_and_change_viewport(ImoId scoreId, TimeUnits timepos);
 
+    /** 
+     */
+    virtual void get_pixel_bounds_for_tempo_line(ImoId scoreId, TimeUnits timepos, Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight);
+
+    virtual void get_pixel_bounds_for_measure_at(ImoId scoreId, TimeUnits timepos, Pixels* xPos, Pixels* yPos, Pixels* xWidth, Pixels* yHeight);
+
+    virtual bool get_pixel_size_for_entire_score(ImoId scoreId, Pixels* xWidth, Pixels* yHeight);
+
+    
     /** @param scoreId  Id. of the score to which the operation refers.
         @param timepos The time position to move the tempo line to.
         @todo Document Interactor::highlight_object    */
@@ -475,6 +485,7 @@ protected:
     //  do_determine_if_scroll_needed()
     GmoBoxSystem* m_pScrollSystem;
     LUnits m_xScrollLeft, m_xScrollRight;
+    LUnits m_xMeasLeft, m_xMeasRight;
 
     bool determine_page_system_and_position_for(ImoId scoreId, TimeUnits timepos);
     virtual void do_change_viewport_if_necessary();
@@ -654,6 +665,74 @@ protected:
 
 };
 
+//---------------------------------------------------------------------------------------
+/** %SingleSystemVerticalView is a GraphicView for rendering documents that only contain one
+    score (e.g. LDP files, LMD files with just one score, and score files imported
+    from other formats such as MusicXML). If the document does not contains scores
+    or contains more than one score, this view will display an empty view.
+
+    This view will display the score in a single system, as if the paper had infinite
+    HEIGHT. And for viewing the end of the score the user will have to scroll to the
+    bottom.
+
+    When the displayed score does not end in barline but the staff lines continue
+    running until the end of the page, the staff lines will be finished after running
+    empty for the length of last occupied measure.
+
+
+    <b>Margins</b>
+
+    The score is displayed on a white paper and the margins around the score are
+    as follows:
+    - Top margin = document top margin + score top margin
+    - Left margin = document left margin + score left margin
+    - Bottom margin = Top margin
+    - Right margin = Left margin
+
+
+    <b>Background color</b>
+
+    The white paper is surrounded by the background (gray color). As with all Views,
+    the background color can be changed by invoking Interactor::set_view_background().
+    E.g. for suppressing the background:
+    @code
+        m_pPresenter = lomse.open_document(k_view_single_system_vertical, filename);
+        if (SpInteractor spInteractor = m_pPresenter->get_interactor(0).lock())
+        {
+            spInteractor->set_rendering_buffer(&m_rbuf_window);
+            spInteractor->set_view_background( Color(255,255,255) );  //white
+            ...
+    @endcode
+
+
+    <b>AutoScroll</b>
+
+    As playback advances the View generates EventUpdateViewport events so that measure
+    being played is always totally visible.
+
+*/
+class LOMSE_EXPORT SingleSystemVerticalView : public GraphicView
+{
+public:
+///@cond INTERNALS
+//excluded from public API because the View methods are managed from Interactor
+
+    SingleSystemVerticalView(LibraryScope& libraryScope, ScreenDrawer* pDrawer);
+    virtual ~SingleSystemVerticalView() {}
+
+    virtual int page_at_screen_point(double x, double y);
+
+    void set_viewport_for_page_fit_full(Pixels screenWidth);
+    void get_view_size(Pixels* xWidth, Pixels* yHeight);
+    virtual int get_layout_constrains() { return k_use_paper_width | k_infinite_height; }
+    bool is_valid_for_this_view(Document* pDoc);
+
+///@endcond
+
+protected:
+    void collect_page_bounds();
+
+};
 
 
 }   //namespace lomse

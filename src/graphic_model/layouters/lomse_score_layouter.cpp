@@ -1286,8 +1286,10 @@ void ShapesCreator::continue_engraving_relobj(ImoRelObj* pRO,
 
     RelObjEngraver* pEngrv
         = static_cast<RelObjEngraver*>(m_engravers.get_engraver(pRO));
-    pEngrv->set_middle_staffobj(pRO, pSO, pStaffObjShape, iInstr, iStaff, iSystem, iCol,
-                                xLeft, xRight, yTop, idxStaff, pVProfile);
+    if (pEngrv) {
+        pEngrv->set_middle_staffobj(pRO, pSO, pStaffObjShape, iInstr, iStaff, iSystem, iCol,
+                                    xLeft, xRight, yTop, idxStaff, pVProfile);
+    }
 }
 
 //---------------------------------------------------------------------------------------
@@ -1307,9 +1309,11 @@ void ShapesCreator::finish_engraving_relobj(ImoRelObj* pRO,
 
     RelObjEngraver* pEngrv
         = static_cast<RelObjEngraver*>(m_engravers.get_engraver(pRO));
-    pEngrv->set_end_staffobj(pRO, pSO, pStaffObjShape, iInstr, iStaff, iSystem, iCol,
-                             xLeft, xRight, yTop, idxStaff, pVProfile);
-    pEngrv->set_prolog_width( prologWidth );
+    if (pEngrv) {
+        pEngrv->set_end_staffobj(pRO, pSO, pStaffObjShape, iInstr, iStaff, iSystem, iCol,
+                                 xLeft, xRight, yTop, idxStaff, pVProfile);
+        pEngrv->set_prolog_width( prologWidth );
+    }
 }
 
 //---------------------------------------------------------------------------------------
@@ -1317,7 +1321,13 @@ GmoShape* ShapesCreator::create_last_shape(ImoRelObj* pRO)
 {
     RelObjEngraver* pEngrv
         = static_cast<RelObjEngraver*>(m_engravers.get_engraver(pRO));
-    return pEngrv->create_last_shape(pRO->get_color());
+    if (pEngrv) {
+        return pEngrv->create_last_shape(pRO->get_color());
+    }
+    else {
+        std::cerr << "Could not get engraver in create_last_shape." << std::endl;
+        return nullptr;
+    }
 }
 
 //---------------------------------------------------------------------------------------
@@ -1325,7 +1335,13 @@ GmoShape* ShapesCreator::create_first_or_intermediate_shape(ImoRelObj* pRO)
 {
     RelObjEngraver* pEngrv
         = static_cast<RelObjEngraver*>(m_engravers.get_engraver(pRO));
-    return pEngrv->create_first_or_intermediate_shape(pRO->get_color());
+    if (pEngrv) {
+        return pEngrv->create_first_or_intermediate_shape(pRO->get_color());
+    }
+    else {
+        std::cerr << "Could not get engraver in create_first_or_intermediate_shape." << std::endl;     
+        return nullptr;
+    }
 }
 
 //---------------------------------------------------------------------------------------

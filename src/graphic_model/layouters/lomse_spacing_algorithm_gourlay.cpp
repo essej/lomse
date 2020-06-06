@@ -1176,6 +1176,8 @@ void TimeSlice::move_shapes_to_final_positions(vector<StaffObjData*>& data, LUni
             //update system vertical limits
             *yMax = max(*yMax, pShape->get_bottom());
             *yMin = min(*yMin, pShape->get_top());
+            
+            //fprintf(stderr, "TSi: %d st: %d top: %8g bot: %8g\n", i, pData->m_idxStaff, pShape->get_top(), pShape->get_bottom());
         }
     }
 }

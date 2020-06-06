@@ -121,8 +121,12 @@ void VerticalProfile::update(GmoShape* pShape, int idxStaff)
         if (pNote->is_in_chord() && pNote->is_shape_chord_base_note())
         {
             GmoShapeNote* pFlagNote = static_cast<GmoShapeChordBaseNote*>(pNote)->get_flag_note();
-            update_shape(pFlagNote->get_stem_shape(), idxStaff);
-            update_shape(pFlagNote->get_flag_shape(), idxStaff);
+            if (pFlagNote) {    
+                update_shape(pFlagNote->get_stem_shape(), idxStaff);
+                update_shape(pFlagNote->get_flag_shape(), idxStaff);
+            } else {
+                LOMSE_LOG_ERROR("Missing pFlagNote in shapechordbasenote!");
+            }
             return;
         }
 
@@ -161,8 +165,8 @@ void VerticalProfile::update_shape(GmoShape* pShape, int idxStaff)
     if (xLeft < m_xStart || xRight > m_xEnd)
         return;
 
-//    dbgLogger << "Update shape " << pShape->get_name() << ", yTop=" << yTop
-//        << ", yBottom=" << yBottom << ", staff=" << idxStaff << endl;
+    //dbgLogger << "Update shape " << pShape->get_name() << ", yTop=" << yTop
+    //    << ", yBottom=" << yBottom << ", staff=" << idxStaff << endl;
 
     //update limits
     if (m_yMin[idxStaff] == LOMSE_PAPER_LOWER_LIMIT)
@@ -176,6 +180,9 @@ void VerticalProfile::update_shape(GmoShape* pShape, int idxStaff)
         m_yMax[idxStaff] = max(m_yMax[idxStaff], yBottom);
 
 
+    //fprintf(stderr, "Update MSS %2d  shape %s  yTop: %10.1f  yBot: %10.1f   ymin: %10.1f  ymax: %10.1f   H: %10.1f\n", idxStaff, pShape->get_name().c_str(), yTop, yBottom, m_yMin[idxStaff], m_yMax[idxStaff], m_yMax[idxStaff] - m_yMin[idxStaff]);
+
+    
     //update xPos and shapes, minimum profile
     list<VProfilePoint>* pPointsMin = m_xMin[idxStaff];
     update_profile(pPointsMin, yTop, false, xLeft, xRight, pShape);    //false -> minimum profile
@@ -372,9 +379,22 @@ GmoShape* VerticalProfile::dbg_generate_shape(bool fMax, int idxStaff)
     pShape->add_vertex('L', xLast, yStart);
     pShape->add_vertex('Z',    0.0f,    0.0f);
     pShape->close_vertex_list();
-
+    pShape->staff_index = idxStaff;
     return pShape;
 }
+
+void VerticalProfile::reposition_debug_shapes(GmoBox* pBoxSystem, const vector<LUnits>& yOrgShifts)
+{
+    for (int i=0; i < pBoxSystem->get_num_shapes(); ++i) {
+        GmoShapeDebug * dbgs = dynamic_cast<GmoShapeDebug*>(pBoxSystem->get_shape(i));
+        if (dbgs) {
+            if (dbgs->staff_index < yOrgShifts.size()) {
+                dbgs->reposition_shape(yOrgShifts[dbgs->staff_index]);
+            }
+        }
+    }
+}
+
 
 //---------------------------------------------------------------------------------------
 string VerticalProfile::dump_min(int idxStaff)
@@ -441,7 +461,7 @@ LUnits VerticalProfile::get_staves_distance(int idxStaff)
             LOMSE_LOG_ERROR("Impossible case!");
             break;
         }
-	    distance = min(distance, yCur - yPrev);
+	    distance = min(distance, yCur - yPrev);               
 	}
 
     return distance;
