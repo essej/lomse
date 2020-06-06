@@ -412,7 +412,7 @@ void MyFrame::OnOpen(wxCommandEvent& WXUNUSED(event))
     wxString defaultPath = wxT("../../../test-scores/");
 
     wxString filename = wxFileSelector(_("Open score"), defaultPath,
-        wxEmptyString, wxEmptyString, wxT("LenMus files|*.lms;*.lmd"));
+        wxEmptyString, wxEmptyString, wxT("LenMus files|*.lms;*.lmd;*.xml"));
 
     if (filename.empty())
         return;

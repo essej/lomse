@@ -328,7 +328,7 @@ void MyFrame::OnOpen(wxCommandEvent& WXUNUSED(event))
     wxString defaultPath = wxT("../../../test-scores/");
 
     wxString filename = wxFileSelector(_("Open score"), defaultPath,
-        wxEmptyString, wxEmptyString, wxT("LenMus files|*.lms;*.lmd"));
+        wxEmptyString, wxEmptyString, wxT("LenMus files|*.lms;*.lmd;*.xml"));
 
     if (filename.empty())
         return;
@@ -616,6 +616,7 @@ void MyCanvas::on_key(int x, int y, unsigned key, unsigned flags)
                 spInteractor->switch_task(TaskFactory::k_task_selection);
                 break;
             case '+':
+            case '=':
                 spInteractor->zoom_in(x, y);
                 force_redraw();
                 break;
