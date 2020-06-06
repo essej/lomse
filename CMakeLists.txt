@@ -640,7 +640,7 @@ endif()
 ###############################################################################
 
 if(NOT DEFINED LOMSE_PKG_CONFIG_INSTALL)
-    set( LOMSE_PKG_CONFIG_INSTALL "/usr/lib/pkgconfig" )
+    set( LOMSE_PKG_CONFIG_INSTALL "/usr/local/lib/pkgconfig" )
 endif()
 
 set(prefix ${CMAKE_INSTALL_PREFIX})
